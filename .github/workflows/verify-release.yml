@@ -1,0 +1,65 @@
+name: Verify release checksum
+
+# Runs when you publish a GitHub Release. It downloads the attached APK(s) and their
+# .sha256 file(s) and recomputes the checksums — failing the run if anything doesn't match,
+# if an APK was uploaded without a checksum, or if a checksum was uploaded without its APK.
+# This guards against a corrupted or tampered upload; it does not build anything.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p assets
+          gh release download "${{ github.event.release.tag_name }}" \
+            --repo "${{ github.repository }}" \
+            --pattern '*.apk' \
+            --pattern '*.apk.sha256' \
+            --dir assets
+
+      - name: Verify checksums
+        working-directory: assets
+        run: |
+          shopt -s nullglob
+          apks=(*.apk)
+          sums=(*.apk.sha256)
+
+          if [ ${#sums[@]} -eq 0 ]; then
+            echo "::error::No .sha256 checksum file is attached to this release."
+            exit 1
+          fi
+
+          fail=0
+
+          # Every uploaded APK must ship with a matching checksum file.
+          for apk in "${apks[@]}"; do
+            if [ ! -f "${apk}.sha256" ]; then
+              echo "::error::${apk} was uploaded without a ${apk}.sha256 checksum."
+              fail=1
+            fi
+          done
+
+          # Every checksum must match its (present) APK.
+          for sum in "${sums[@]}"; do
+            echo "==> Verifying ${sum}"
+            if ! sha256sum -c "${sum}"; then
+              echo "::error::Checksum verification FAILED for ${sum}."
+              fail=1
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Release checksum verification failed — the assets are not trustworthy."
+            exit 1
+          fi
+          echo "All release checksums verified."

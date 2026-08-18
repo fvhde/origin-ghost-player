@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Origin Ghost Player</string>
+    <string name="channel_name">Origin Ghost Player</string>
+    <string name="channel_desc">Relays the currently playing external media session</string>
+    <string name="status_granted">Notification access: granted</string>
+    <string name="status_not_granted">Notification access: NOT granted</string>
+    <string name="open_settings">Open notification listener settings</string>
+</resources>

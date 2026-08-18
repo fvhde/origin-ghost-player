@@ -1,0 +1,53 @@
+Origin Ghost Player — Source-Available, No-Redistribution License
+Copyright (c) 2026 Origin Ghost Player contributors. All rights reserved.
+
+This is NOT an open-source license. The source is made visible for transparency
+and personal use only.
+
+1. Grant. You are permitted to:
+   (a) view and study the source code in this repository; and
+   (b) build the application from this source and install and use the resulting
+       build on devices you personally own or control.
+
+2. Restrictions. You may NOT, without the prior written permission of the
+   copyright holder:
+   (a) redistribute, publish, host, mirror, or otherwise make available this
+       source code or any build/binary of it (signed or unsigned), in whole or
+       in part, to any third party;
+   (b) distribute modified versions, forks, or derivative works of this software
+       to any third party;
+   (c) sell, sublicense, or offer this software (modified or not) as a product
+       or service; or
+   (d) remove or alter this notice.
+
+   These restrictions exist specifically to prevent third parties from
+   repackaging this app — which reads device notifications — and redistributing
+   a tampered or malware-laced build under this project's name. The official,
+   trusted build is the one signed with the maintainer's key and published on
+   the project's own release page; do not trust any build obtained elsewhere.
+
+3. No warranty. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+   EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
+   OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+   ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+   DEALINGS IN THE SOFTWARE.
+
+---
+
+Third-party / interoperability notes:
+
+- This project's `applicationId` intentionally matches a third-party app
+  ("Kugou Music Lite" / 酷狗音乐概念版, com.kugou.android.lite) in order to be
+  recognized by a vivo OriginOS system feature (the native "OriginPlayer" media
+  widget) that is keyed by package name (see README.md and docs/DEV.md). This
+  license covers only the original code in this repository. It does not grant
+  any rights to, and this project is not affiliated with, endorsed by, or
+  associated with Kugou or vivo. Build and use at your own risk, for personal
+  purposes, on your own device.
+
+- This project is a companion to origin-isle (github.com/fvhde/origin-isle),
+  same maintainer, same signing key. Neither project's reverse-engineered
+  interoperability details are anyone's intellectual property; they are
+  documented here for interoperability and educational purposes.

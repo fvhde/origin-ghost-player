@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Package-visibility filtering (targetSdk 30+) hides other apps from
+         PackageManager.getLaunchIntentForPackage() by default, which was silently breaking
+         click-through — it always returned null and fell back to our own app. This grants
+         visibility into any launchable app without needing the broad QUERY_ALL_PACKAGES permission. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.MediaProbe"
+        android:supportsRtl="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Listens system-wide for other apps' media sessions and mirrors them onto this app's
+             OWN MediaSession under its (spoofed) identity — nothing else, no notification posted. -->
+        <service
+            android:name=".MediaProbeListener"
+            android:exported="true"
+            android:label="Media Probe Listener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Gives the probe's MediaSession a mediaButtonReceiver, matching real player sessions. -->
+        <receiver
+            android:name=".MediaButtonReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Keeps the identity bridge running across a swipe-away, same recipe as OrangeBox-src's
+             PlaygroundService: stopWithTask=false + an onTaskRemoved restart alarm. -->
+        <service
+            android:name=".KeepAliveService"
+            android:foregroundServiceType="specialUse"
+            android:stopWithTask="false">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Media identity bridge keep-alive" />
+        </service>
+
+    </application>
+</manifest>
