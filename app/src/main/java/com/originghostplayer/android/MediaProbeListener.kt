@@ -3,6 +3,9 @@ package com.originghostplayer.android
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.media.session.MediaController
 import android.media.session.MediaSession
 import android.media.session.MediaSessionManager
@@ -149,8 +152,57 @@ class MediaProbeListener : NotificationListenerService() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 ),
             )
+
+            // Experiment: real players register in AudioManager's AudioPlaybackConfiguration list
+            // (actually outputting audio) when they start; our passive session-mirror never does.
+            // Play a genuinely silent clip — deliberately WITHOUT ever requesting audio focus, so
+            // there's no focus-arbitration event to pause/duck the real app — purely to register
+            // as an active audio output, which is what OriginPlayer's takeover turned out to
+            // watch for (confirmed: no audible glitch, but success was inconsistent at 300ms/1
+            // shot — likely a timing race against the real app's own still-active output). Longer,
+            // and fired twice, to improve the odds of landing cleanly.
+            playSilentBlip(controller, durationMs = 800)
+            pollHandler.postDelayed({ playSilentBlip(controller, durationMs = 800) }, 1200L)
         }
         syncSession(controller)
+    }
+
+    private fun playSilentBlip(controller: MediaController, durationMs: Int) {
+        runCatching {
+            val sampleRate = 44100
+            val silence = ShortArray(sampleRate * durationMs / 1000)
+            val minBuf = AudioTrack.getMinBufferSize(
+                sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT,
+            )
+            val track = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build(),
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build(),
+                )
+                .setBufferSizeInBytes(maxOf(minBuf, silence.size * 2))
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build()
+            track.setVolume(0f)
+            track.write(silence, 0, silence.size)
+            track.play()
+            pollHandler.postDelayed(
+                {
+                    runCatching { track.stop() }
+                    runCatching { track.release() }
+                    runCatching { controller.transportControls.play() }
+                },
+                durationMs + 100L,
+            )
+        }
     }
 
     /** Mirror [controller]'s real metadata/playback state onto our own (spoofed-identity) session. */
