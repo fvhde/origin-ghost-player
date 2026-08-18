@@ -153,16 +153,22 @@ class MediaProbeListener : NotificationListenerService() {
                 ),
             )
 
-            // Experiment: real players register in AudioManager's AudioPlaybackConfiguration list
-            // (actually outputting audio) when they start; our passive session-mirror never does.
-            // Play a genuinely silent clip — deliberately WITHOUT ever requesting audio focus, so
-            // there's no focus-arbitration event to pause/duck the real app — purely to register
-            // as an active audio output, which is what OriginPlayer's takeover turned out to
-            // watch for (confirmed: no audible glitch, but success was inconsistent at 300ms/1
-            // shot — likely a timing race against the real app's own still-active output). Longer,
-            // and fired twice, to improve the odds of landing cleanly.
-            playSilentBlip(controller, durationMs = 800)
-            pollHandler.postDelayed({ playSilentBlip(controller, durationMs = 800) }, 1200L)
+            // Real players register in AudioManager's AudioPlaybackConfiguration list (actually
+            // outputting audio) when they start; our passive session-mirror never does. Play a
+            // genuinely silent clip — deliberately WITHOUT ever requesting audio focus, so there's
+            // no focus-arbitration event to pause/duck the real app — purely to register as active
+            // audio output, which is what OriginPlayer's takeover turned out to watch for. Fired
+            // twice (800ms each) for reliability against a real app's own still-active output.
+            //
+            // Only when actually playing: this used to fire (and unconditionally resume playback
+            // afterwards) for a PAUSED controller too — e.g. whenever the listener reconnects after
+            // being idle and re-picks-up whatever session is there — which meant a track you'd
+            // deliberately paused could resume on its own later. Gate on the real state, both here
+            // and again right before the resume call below (it can change mid-blip).
+            if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+                playSilentBlip(controller, durationMs = 800)
+                pollHandler.postDelayed({ playSilentBlip(controller, durationMs = 800) }, 1200L)
+            }
         }
         syncSession(controller)
     }
@@ -198,7 +204,11 @@ class MediaProbeListener : NotificationListenerService() {
                 {
                     runCatching { track.stop() }
                     runCatching { track.release() }
-                    runCatching { controller.transportControls.play() }
+                    // Only resume if it's still actually playing — never resume something the
+                    // user (or anything else) paused while our blip was running.
+                    if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+                        runCatching { controller.transportControls.play() }
+                    }
                 },
                 durationMs + 100L,
             )
