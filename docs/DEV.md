@@ -6,18 +6,26 @@ to install it, see the [README](../README.md).
 
 ## ⚠️ Read this first: the package name is load-bearing
 
-`applicationId = "com.kugou.android.lite"` in [`app/build.gradle.kts`](../app/build.gradle.kts) is
-**deliberate, not a mistake**. OriginOS's native "OriginPlayer" media widget only activates for a
-short whitelist of packages it recognizes as media players, and this app's `applicationId` spoofs
-Kugou Music Lite's (酷狗音乐概念版) real package id to land on that whitelist. **If you change it,
+`applicationId` in [`app/build.gradle.kts`](../app/build.gradle.kts) is **deliberate, not a
+mistake**. OriginOS's native "OriginPlayer" media widget only activates for a short whitelist of
+packages it recognizes as media players, and this app's `applicationId` spoofs a real whitelisted
+app's package id to land on that whitelist. **If you change it to something not on that whitelist,
 OriginPlayer will stop reacting to this app.**
 
-Two consequences:
+Two identities are confirmed working, built from the exact same code:
 
-1. **It cannot be installed alongside the real Kugou Music Lite app** (same applicationId →
-   package conflict). Uninstall the real app first if you have it.
-2. **This can never ship on the Play Store** or be distributed as if it were Kugou Music Lite. It's
-   a personal sideload — install it on your own device, understand what you're installing.
+- **Kugou Music Lite** (酷狗音乐概念版, `com.kugou.android.lite`) — the one this was first proven on.
+- **Luna Music** (`com.luna.music`) — supports karaoke, which Kugou's identity doesn't get you
+  anything extra for, and its OriginPlayer lockscreen widget renders noticeably bigger album art
+  with more room for text than Kugou's does. Same bridge logic either way; only the identity (and
+  therefore which native widget layout OriginOS picks) differs.
+
+Consequences of spoofing either one:
+
+1. **It cannot be installed alongside the real app whose identity it's using** (same applicationId
+   → package conflict). Uninstall the real Kugou Music Lite or Luna Music app first if you have it.
+2. **This can never ship on the Play Store** or be distributed as if it were that real app. It's a
+   personal sideload — install it on your own device, understand what you're installing.
 
 The Kotlin package / `R` namespace is a separate, harmless identifier:
 `com.originghostplayer.android`. It's just where the code lives; it isn't checked by OriginOS.
@@ -33,7 +41,7 @@ of its own at all. Instead:
    notifications, falling back to `MediaSessionManager.getActiveSessions()` for apps that omit it
    (e.g. Firefox).
 2. It mirrors whatever it finds — metadata, playback state — onto its **own** `MediaSession`,
-   created under the spoofed `com.kugou.android.lite` identity. Real playback control taps are
+   created under the spoofed identity (Kugou or Luna — see above). Real playback control taps are
    forwarded straight back to the real source app's `MediaController.transportControls`.
 3. That's it. No notification, no UI most of the time. OriginOS's OriginPlayer sees a whitelisted
    package with an active, fully-formed media session (real players' sessions all carry a
@@ -53,7 +61,10 @@ Requires Android Studio (AGP 8.9+) and the `android-36` SDK platform.
 1. **Open the folder in Android Studio** and let it sync.
 2. **Run** onto a vivo/iQOO OriginOS device. (It will build and install fine on any Android 14+
    device, but OriginPlayer itself only reacts on OriginOS.)
-3. On first launch, grant notification access when prompted — that's the only permission needed.
+3. On first launch, the screen explains and links to both permissions the app wants: notification
+   access (required — this is how it finds the currently playing session) and unrestricted
+   background running (recommended — without it OriginOS may kill the bridge while your screen is
+   off).
 4. Play something in any media app and check OriginOS's status bar / lock screen / always-on-display
    for the native OriginPlayer widget.
 

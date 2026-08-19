@@ -15,6 +15,12 @@ import android.os.IBinder
  * service (stopWithTask=false in the manifest) that re-arms a restart alarm on task removal, so
  * swiping the app away from recents doesn't kill the identity bridge. The notification channel
  * is IMPORTANCE_NONE, so there's no visible icon for it.
+ *
+ * Also self-reschedules a periodic health-check alarm independent of task removal — a long
+ * background stretch (observed: another app holding audio output for ~10 minutes) can get this
+ * process killed under memory pressure without the task ever being removed, so onTaskRemoved's
+ * restart alarm never engages. The health check re-arms itself every run, so even a silent kill
+ * gets caught at the next scheduled tick instead of staying dead until the user reopens the app.
  */
 class KeepAliveService : Service() {
 
@@ -22,7 +28,10 @@ class KeepAliveService : Service() {
         private const val CHANNEL_ID = "keep_alive"
         private const val FGS_ID = 1
         private const val RESTART_REQUEST = 7001
+        private const val HEALTH_CHECK_REQUEST = 7002
+        private const val HEALTH_CHECK_INTERVAL_MS = 5 * 60 * 1000L
         const val ACTION_KEEPALIVE = "ACTION_KEEPALIVE"
+        const val ACTION_HEALTH_CHECK = "ACTION_HEALTH_CHECK"
 
         fun start(context: Context) {
             context.startService(Intent(context, KeepAliveService::class.java))
@@ -42,6 +51,7 @@ class KeepAliveService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         ensureForeground()
         RebindHelper.forceRebindIfNeeded(applicationContext)
+        scheduleHealthCheck()
         return START_STICKY
     }
 
@@ -56,6 +66,22 @@ class KeepAliveService : Service() {
             )
             getSystemService(AlarmManager::class.java)?.set(
                 AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 1000L, restart,
+            )
+        }
+    }
+
+    /** Re-armed on every start, including a health-check-triggered one — a self-perpetuating
+     *  chain that survives this process dying, since the PendingIntent still fires and restarts
+     *  the service even if nothing is alive to have rescheduled it in the meantime. */
+    private fun scheduleHealthCheck() {
+        runCatching {
+            val check = PendingIntent.getService(
+                this, HEALTH_CHECK_REQUEST,
+                Intent(this, KeepAliveService::class.java).setAction(ACTION_HEALTH_CHECK),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            getSystemService(AlarmManager::class.java)?.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + HEALTH_CHECK_INTERVAL_MS, check,
             )
         }
     }

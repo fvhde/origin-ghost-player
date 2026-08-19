@@ -38,14 +38,15 @@ and personal use only.
 
 Third-party / interoperability notes:
 
-- This project's `applicationId` intentionally matches a third-party app
-  ("Kugou Music Lite" / 酷狗音乐概念版, com.kugou.android.lite) in order to be
-  recognized by a vivo OriginOS system feature (the native "OriginPlayer" media
-  widget) that is keyed by package name (see README.md and docs/DEV.md). This
-  license covers only the original code in this repository. It does not grant
-  any rights to, and this project is not affiliated with, endorsed by, or
-  associated with Kugou or vivo. Build and use at your own risk, for personal
-  purposes, on your own device.
+- This project's `applicationId` intentionally matches a third-party app — either
+  "Kugou Music Lite" / 酷狗音乐概念版 (com.kugou.android.lite) or "Luna Music"
+  (com.luna.music), depending on the build variant — in order to be recognized
+  by a vivo OriginOS system feature (the native "OriginPlayer" media widget)
+  that is keyed by package name (see README.md and docs/DEV.md). This license
+  covers only the original code in this repository. It does not grant any
+  rights to, and this project is not affiliated with, endorsed by, or
+  associated with Kugou, Luna, or vivo. Build and use at your own risk, for
+  personal purposes, on your own device.
 
 - This project is a companion to origin-isle (github.com/fvhde/origin-isle),
   same maintainer, same signing key. Neither project's reverse-engineered

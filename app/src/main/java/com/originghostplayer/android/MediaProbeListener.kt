@@ -105,7 +105,14 @@ class MediaProbeListener : NotificationListenerService() {
             NotificationCompat.EXTRA_MEDIA_SESSION,
             MediaSession.Token::class.java,
         ) ?: return
-        runCatching { MediaController(this, token) }.getOrNull()?.let(::trackController)
+        val controller = runCatching { MediaController(this, token) }.getOrNull() ?: return
+        // This path bypassed pickController's sticky logic entirely: a paused app re-posting its
+        // notification (which pausing typically does) would yank tracking straight back onto it
+        // mid-transition, on top of whatever the poll/sessionsChangedListener had already settled
+        // on — an extra flicker step. Only take over here if it's actually playing.
+        if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+            trackController(controller)
+        }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
@@ -122,11 +129,21 @@ class MediaProbeListener : NotificationListenerService() {
             ?.filter { it.packageName != packageName }
     }.getOrNull()
 
-    /** Prefer whichever session is actually playing — the system's own ordering can lag behind
-     *  an app switch, which was making source-change detection feel slow. */
-    private fun pickController(controllers: List<MediaController>?): MediaController? =
-        controllers?.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-            ?: controllers?.firstOrNull()
+    /** Sticky: keep whatever we're already tracking as long as it's still playing, rather than
+     *  re-picking "first PLAYING" from the list every poll tick. During a handoff between two
+     *  apps, both can briefly report PLAYING simultaneously — re-evaluating from scratch each
+     *  tick made the island flicker between the old and new album art until one settled. Only
+     *  look for a different session once the tracked one actually stops playing (or disappears). */
+    private fun pickController(controllers: List<MediaController>?): MediaController? {
+        val list = controllers ?: return null
+        trackedController?.let { current ->
+            val stillPlaying = list.firstOrNull { it.sessionToken == current.sessionToken }
+                ?.takeIf { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+            if (stillPlaying != null) return stillPlaying
+        }
+        return list.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+            ?: list.firstOrNull()
+    }
 
     private fun trackController(controller: MediaController) {
         if (trackedController?.sessionToken != controller.sessionToken) {

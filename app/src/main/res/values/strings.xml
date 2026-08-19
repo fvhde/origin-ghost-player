@@ -3,7 +3,12 @@
     <string name="app_name">Origin Ghost Player</string>
     <string name="channel_name">Origin Ghost Player</string>
     <string name="channel_desc">Relays the currently playing external media session</string>
-    <string name="status_granted">Notification access: granted</string>
+    <string name="explanation">This app needs notification-listener access to detect which app is currently playing media — that\'s how it finds the active session to mirror. It never reads notification text/content, only media-session info (title, artist, playback state).</string>
+    <string name="status_granted">Notification access: granted ✓</string>
     <string name="status_not_granted">Notification access: NOT granted</string>
     <string name="open_settings">Open notification listener settings</string>
+    <string name="battery_explanation">Also allow unrestricted background running, so OriginOS doesn\'t kill the bridge while your screen is off or another app is in the foreground.</string>
+    <string name="battery_granted">Background run: unrestricted ✓</string>
+    <string name="battery_not_granted">Background run: restricted (tap to allow)</string>
+    <string name="allow_background">Allow background run</string>
 </resources>

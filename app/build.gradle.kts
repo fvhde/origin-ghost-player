@@ -21,15 +21,28 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        // The identity under test: OriginOS recognizes this package as a native media player
-        // (Kugou Music Lite). Confirmed working: with an active MediaSession + mediaButtonReceiver
-        // under this identity, OriginOS's native OriginPlayer widget renders for ANY real source
-        // app (tested with Metrolist, Firefox) — applicationId is what OriginPlayer keys off.
-        applicationId = "com.kugou.android.lite"
+        // applicationId is set per product flavor below — it's the load-bearing identity spoof,
+        // see docs/DEV.md. minSdk/targetSdk/version are shared: same code, same release, two
+        // identities.
         minSdk = 34
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.2.1"
+        versionCode = 5
+        versionName = "0.3.0"
+    }
+
+    flavorDimensions += "identity"
+    productFlavors {
+        create("kugou") {
+            dimension = "identity"
+            // Kugou Music Lite (酷狗音乐概念版) — the identity this was first proven on.
+            applicationId = "com.kugou.android.lite"
+        }
+        create("luna") {
+            dimension = "identity"
+            // Luna Music — bigger lockscreen widget + karaoke support in OriginPlayer that
+            // Kugou's identity doesn't get you. Same code otherwise.
+            applicationId = "com.luna.music"
+        }
     }
 
     signingConfigs {
