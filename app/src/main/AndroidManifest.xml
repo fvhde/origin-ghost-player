@@ -24,9 +24,14 @@
         android:theme="@style/Theme.OriginGhostPlayer"
         android:supportsRtl="true">
 
+        <!-- singleTask: OriginPlayer's tap-through and a direct launcher-icon tap otherwise
+             ambiguously reuse an existing instance without a fresh onCreate — singleTask
+             guarantees onNewIntent() fires instead, so the referrer-based redirect logic (see
+             MainActivity) is checked on every launch, not just a cold start. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

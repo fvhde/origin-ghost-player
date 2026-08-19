@@ -13,6 +13,19 @@
         android:padding="24dp">
 
         <TextView
+            android:id="@+id/now_playing_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:padding="16dp"
+            android:layout_marginBottom="24dp"
+            android:background="#22808080"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="14sp"

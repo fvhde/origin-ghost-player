@@ -11,4 +11,6 @@
     <string name="battery_granted">Background run: unrestricted ✓</string>
     <string name="battery_not_granted">Background run: restricted (tap to allow)</string>
     <string name="allow_background">Allow background run</string>
+    <string name="now_playing_none">Nothing playing right now</string>
+    <string name="now_playing_format">▶ %1$s\n%2$s\nvia %3$s — tap to open</string>
 </resources>
