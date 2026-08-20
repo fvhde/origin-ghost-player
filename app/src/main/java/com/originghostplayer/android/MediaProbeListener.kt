@@ -12,6 +12,7 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
@@ -29,12 +30,25 @@ class MediaProbeListener : NotificationListenerService() {
         var instance: MediaProbeListener? = null
 
         private const val POLL_INTERVAL_MS = 1000L
+
+        /** How long a source with no real PlaybackState (Firefox observed) can sit unchanged
+         *  before we give up mirroring it as "playing" and clear it instead. See [syncSession]. */
+        private const val UNKNOWN_STATE_STALE_MS = 3 * 60 * 1000L
     }
 
     private var mediaSession: MediaSession? = null
     private var trackedController: MediaController? = null
     private var controllerCallback: MediaController.Callback? = null
     private val pollHandler = Handler(Looper.getMainLooper())
+
+    /** Was the currently-tracked controller PLAYING as of the last [syncSession] call? Drives the
+     *  silent-blip re-announcement below — reset whenever the tracked controller itself changes. */
+    private var lastKnownPlaying = false
+
+    /** Bookkeeping for the no-real-PlaybackState staleness check in [syncSession]: when we started
+     *  assuming "playing" for the current controller's current metadata, and what that metadata was. */
+    private var unknownStateSince = 0L
+    private var unknownStateMetadataKey: String? = null
 
     /** Exposed for [MediaButtonReceiver], which has no other way to reach the tracked controller. */
     fun currentController(): MediaController? = trackedController
@@ -170,22 +184,10 @@ class MediaProbeListener : NotificationListenerService() {
                 ),
             )
 
-            // Real players register in AudioManager's AudioPlaybackConfiguration list (actually
-            // outputting audio) when they start; our passive session-mirror never does. Play a
-            // genuinely silent clip — deliberately WITHOUT ever requesting audio focus, so there's
-            // no focus-arbitration event to pause/duck the real app — purely to register as active
-            // audio output, which is what OriginPlayer's takeover turned out to watch for. Fired
-            // twice (800ms each) for reliability against a real app's own still-active output.
-            //
-            // Only when actually playing: this used to fire (and unconditionally resume playback
-            // afterwards) for a PAUSED controller too — e.g. whenever the listener reconnects after
-            // being idle and re-picks-up whatever session is there — which meant a track you'd
-            // deliberately paused could resume on its own later. Gate on the real state, both here
-            // and again right before the resume call below (it can change mid-blip).
-            if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
-                playSilentBlip(controller, durationMs = 800)
-                pollHandler.postDelayed({ playSilentBlip(controller, durationMs = 800) }, 1200L)
-            }
+            // A genuinely new controller starts "unknown" rather than assumed-playing — syncSession
+            // below compares against this and fires the re-announcement blip itself the moment the
+            // real state comes in as PLAYING, same as a resume on an existing controller would.
+            lastKnownPlaying = false
         }
         syncSession(controller)
     }
@@ -235,6 +237,35 @@ class MediaProbeListener : NotificationListenerService() {
     /** Mirror [controller]'s real metadata/playback state onto our own (spoofed-identity) session. */
     private fun syncSession(controller: MediaController) {
         val session = mediaSession ?: return
+
+        // Some sources (Firefox observed) never report a PlaybackState at all — there's no real
+        // state to mirror, ever, and no transition to notice when they actually stop. Defaulting
+        // that case to STATE_PLAYING is what makes OriginPlayer notice such a source at all (the
+        // blip below only fires on a PLAYING transition) — defaulting to PAUSED instead silences
+        // it completely, which regressed Firefox not showing up at all. So: keep assuming PLAYING,
+        // but only as long as the metadata (title/artist/album) is actually still changing — once
+        // it's sat unchanged past the timeout, treat it as finished/abandoned and clear instead of
+        // reporting it as playing forever.
+        if (controller.playbackState == null) {
+            val md = controller.metadata
+            val key = listOf(
+                md?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE),
+                md?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST),
+                md?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM),
+            ).joinToString("|")
+            val now = SystemClock.elapsedRealtime()
+            if (key != unknownStateMetadataKey) {
+                unknownStateMetadataKey = key
+                unknownStateSince = now
+            } else if (now - unknownStateSince > UNKNOWN_STATE_STALE_MS) {
+                clearSession()
+                return
+            }
+        } else {
+            unknownStateMetadataKey = null
+            unknownStateSince = 0L
+        }
+
         session.setMetadata(controller.metadata)
         val state = controller.playbackState ?: PlaybackState.Builder()
             .setState(PlaybackState.STATE_PLAYING, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1f)
@@ -246,12 +277,34 @@ class MediaProbeListener : NotificationListenerService() {
             .build()
         session.setPlaybackState(state)
         session.isActive = true
+
+        // Real players register in AudioManager's AudioPlaybackConfiguration list (actually
+        // outputting audio) when they start; our passive session-mirror never does. Play a
+        // genuinely silent clip — deliberately WITHOUT ever requesting audio focus, so there's no
+        // focus-arbitration event to pause/duck the real app — purely to register as active audio
+        // output, which is what OriginPlayer's takeover turned out to watch for.
+        //
+        // Fired on every transition INTO playing, not just when a brand-new controller shows up:
+        // OriginPlayer can apparently let go of us during a paused/idle stretch (matching the
+        // original "cold start needs a manual reselect" behavior this blip was built to fix), and
+        // resuming an EXISTING controller used to never re-trigger it, leaving OriginPlayer stuck
+        // showing us as selected but not updating until you manually reselected another app and
+        // back. Re-announcing on every playing-transition covers both cases uniformly.
+        val isPlayingNow = state.state == PlaybackState.STATE_PLAYING
+        if (isPlayingNow && !lastKnownPlaying) {
+            playSilentBlip(controller, durationMs = 800)
+            pollHandler.postDelayed({ playSilentBlip(controller, durationMs = 800) }, 1200L)
+        }
+        lastKnownPlaying = isPlayingNow
     }
 
     private fun clearSession() {
         controllerCallback?.let { trackedController?.unregisterCallback(it) }
         trackedController = null
         controllerCallback = null
+        lastKnownPlaying = false
+        unknownStateMetadataKey = null
+        unknownStateSince = 0L
         mediaSession?.isActive = false
     }
 }
