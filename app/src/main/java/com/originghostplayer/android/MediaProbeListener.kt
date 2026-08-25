@@ -305,6 +305,16 @@ class MediaProbeListener : NotificationListenerService() {
         lastKnownPlaying = false
         unknownStateMetadataKey = null
         unknownStateSince = 0L
+        // isActive=false alone left OriginPlayer's chip stuck animating "playing" indefinitely —
+        // the last PlaybackState it ever saw from us was STATE_PLAYING, and nothing had told it
+        // otherwise. Push an explicit STOPPED state (and drop the stale metadata) before going
+        // inactive, so there's a real "this stopped" signal for it to react to.
+        mediaSession?.setPlaybackState(
+            PlaybackState.Builder()
+                .setState(PlaybackState.STATE_STOPPED, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1f)
+                .build(),
+        )
+        mediaSession?.setMetadata(null)
         mediaSession?.isActive = false
     }
 }
