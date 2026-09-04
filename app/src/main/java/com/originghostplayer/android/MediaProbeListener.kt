@@ -34,6 +34,15 @@ class MediaProbeListener : NotificationListenerService() {
         /** How long a source with no real PlaybackState (Firefox observed) can sit unchanged
          *  before we give up mirroring it as "playing" and clear it instead. See [syncSession]. */
         private const val UNKNOWN_STATE_STALE_MS = 3 * 60 * 1000L
+
+        /** Floor between silent-blip bursts (each burst is 2 blips, ~2.1s apart end-to-end — see
+         *  [syncSession]). Defense in depth against any source whose PlaybackState itself bounces
+         *  off PLAYING and back in rapid, repeated transitions (whatever the cause) queuing bursts
+         *  faster than they can drain: unbounded, that was observed pinning the system's AudioTrack
+         *  pool (rapid "No More Track Available" from repeated blip creation) when a real player's
+         *  onPlay() handler turned out not to be idempotent — see the removed resume-on-completion
+         *  call this used to pair with, in git history. */
+        private const val MIN_BLIP_BURST_INTERVAL_MS = 2500L
     }
 
     private var mediaSession: MediaSession? = null
@@ -49,6 +58,10 @@ class MediaProbeListener : NotificationListenerService() {
      *  assuming "playing" for the current controller's current metadata, and what that metadata was. */
     private var unknownStateSince = 0L
     private var unknownStateMetadataKey: String? = null
+
+    /** [SystemClock.elapsedRealtime] of the last silent-blip burst we actually fired — see
+     *  [MIN_BLIP_BURST_INTERVAL_MS]. */
+    private var lastBlipBurstAt = 0L
 
     /** Exposed for [MediaButtonReceiver], which has no other way to reach the tracked controller. */
     fun currentController(): MediaController? = trackedController
@@ -188,6 +201,8 @@ class MediaProbeListener : NotificationListenerService() {
             // below compares against this and fires the re-announcement blip itself the moment the
             // real state comes in as PLAYING, same as a resume on an existing controller would.
             lastKnownPlaying = false
+            // A different source shouldn't be held back by the outgoing one's debounce window.
+            lastBlipBurstAt = 0L
         }
         syncSession(controller)
     }
@@ -223,11 +238,6 @@ class MediaProbeListener : NotificationListenerService() {
                 {
                     runCatching { track.stop() }
                     runCatching { track.release() }
-                    // Only resume if it's still actually playing — never resume something the
-                    // user (or anything else) paused while our blip was running.
-                    if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
-                        runCatching { controller.transportControls.play() }
-                    }
                 },
                 durationMs + 100L,
             )
@@ -291,7 +301,9 @@ class MediaProbeListener : NotificationListenerService() {
         // showing us as selected but not updating until you manually reselected another app and
         // back. Re-announcing on every playing-transition covers both cases uniformly.
         val isPlayingNow = state.state == PlaybackState.STATE_PLAYING
-        if (isPlayingNow && !lastKnownPlaying) {
+        val now = SystemClock.elapsedRealtime()
+        if (isPlayingNow && !lastKnownPlaying && now - lastBlipBurstAt >= MIN_BLIP_BURST_INTERVAL_MS) {
+            lastBlipBurstAt = now
             playSilentBlip(controller, durationMs = 800)
             pollHandler.postDelayed({ playSilentBlip(controller, durationMs = 800) }, 1200L)
         }
