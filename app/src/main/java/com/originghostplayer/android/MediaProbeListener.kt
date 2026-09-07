@@ -1,8 +1,13 @@
 package com.originghostplayer.android
 
 import android.app.PendingIntent
+import android.app.UiModeManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.res.Configuration
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
@@ -22,6 +27,11 @@ import androidx.core.app.NotificationCompat
  * onto this app's OWN MediaSession — under this app's spoofed identity — with NO notification of
  * our own posted at any point. Confirmed working: OriginOS's native OriginPlayer picks this
  * session up regardless of the real source app (tested with Metrolist and Firefox).
+ *
+ * Suppressed entirely while the phone is in car mode (Android Auto projects onto the phone by
+ * putting it into UI_MODE_TYPE_CAR): the real source app's session already reaches the head unit
+ * directly, so mirroring it too made Android Auto's media screen show the same "now playing" info
+ * twice, as two separate players.
  */
 class MediaProbeListener : NotificationListenerService() {
 
@@ -50,6 +60,10 @@ class MediaProbeListener : NotificationListenerService() {
     private var controllerCallback: MediaController.Callback? = null
     private val pollHandler = Handler(Looper.getMainLooper())
 
+    /** Registered in [onListenerConnected], torn down in [onListenerDisconnected] — see
+     *  [isInCarMode]. */
+    private var carModeReceiver: BroadcastReceiver? = null
+
     /** Was the currently-tracked controller PLAYING as of the last [syncSession] call? Drives the
      *  silent-blip re-announcement below — reset whenever the tracked controller itself changes. */
     private var lastKnownPlaying = false
@@ -68,16 +82,29 @@ class MediaProbeListener : NotificationListenerService() {
 
     private val pollRunnable = object : Runnable {
         override fun run() {
-            pickController(activeSessions())?.let(::trackController) ?: clearSession()
+            maybeTrack(pickController(activeSessions()))
             pollHandler.postDelayed(this, POLL_INTERVAL_MS)
         }
     }
 
     private val sessionsChangedListener =
         MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-            pickController(controllers?.filter { it.packageName != packageName })?.let(::trackController)
-                ?: clearSession()
+            maybeTrack(pickController(controllers?.filter { it.packageName != packageName }))
         }
+
+    /** True while Android Auto has the phone projected onto a head unit. See the class doc for
+     *  why mirroring is suppressed in that state. */
+    private fun isInCarMode(): Boolean =
+        (getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)
+            ?.currentModeType == Configuration.UI_MODE_TYPE_CAR
+
+    private fun maybeTrack(controller: MediaController?) {
+        if (isInCarMode()) {
+            clearSession()
+            return
+        }
+        controller?.let(::trackController) ?: clearSession()
+    }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
@@ -106,7 +133,26 @@ class MediaProbeListener : NotificationListenerService() {
             getSystemService(MediaSessionManager::class.java)
                 ?.addOnActiveSessionsChangedListener(sessionsChangedListener, component)
         }
-        pickController(activeSessions())?.let(::trackController)
+        carModeReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                when (intent.action) {
+                    // Entering car mode: drop our mirrored session immediately rather than
+                    // waiting for the next poll tick, so the head unit never briefly sees both.
+                    UiModeManager.ACTION_ENTER_CAR_MODE -> clearSession()
+                    UiModeManager.ACTION_EXIT_CAR_MODE -> maybeTrack(pickController(activeSessions()))
+                }
+            }
+        }.also {
+            registerReceiver(
+                it,
+                IntentFilter().apply {
+                    addAction(UiModeManager.ACTION_ENTER_CAR_MODE)
+                    addAction(UiModeManager.ACTION_EXIT_CAR_MODE)
+                },
+                Context.RECEIVER_NOT_EXPORTED,
+            )
+        }
+        maybeTrack(pickController(activeSessions()))
         pollHandler.postDelayed(pollRunnable, POLL_INTERVAL_MS)
     }
 
@@ -118,6 +164,8 @@ class MediaProbeListener : NotificationListenerService() {
             getSystemService(MediaSessionManager::class.java)
                 ?.removeOnActiveSessionsChangedListener(sessionsChangedListener)
         }
+        carModeReceiver?.let { runCatching { unregisterReceiver(it) } }
+        carModeReceiver = null
         clearSession()
         mediaSession?.release()
         mediaSession = null
@@ -128,6 +176,7 @@ class MediaProbeListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
+        if (isInCarMode()) return
         val token = sbn.notification.extras.getParcelable(
             NotificationCompat.EXTRA_MEDIA_SESSION,
             MediaSession.Token::class.java,

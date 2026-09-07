@@ -49,7 +49,8 @@ class MainActivity : Activity() {
         // carries the launcher's own package (e.g. com.bbk.launcher2) and is excluded on purpose.
         private val REDIRECT_SOURCE_PACKAGES = setOf(
             "com.vivo.musicwidgetmix", // Control Panel's OriginPlayer MusicCard
-            "com.vivo.systemuiplugin", // a second system-UI tap surface (status bar/lockscreen)
+            "com.vivo.systemuiplugin", // status bar tap surface
+            "com.android.systemui", // lockscreen media widget tap surface
         )
     }
 
@@ -106,7 +107,8 @@ class MainActivity : Activity() {
      *  us (see REDIRECT_SOURCE_PACKAGES). A direct launcher-icon tap (or any other launch) always
      *  lands on our own screen instead, with a "now playing" row using the actual controller. */
     private fun handleLaunch() {
-        val fromKnownSource = referrer?.host in REDIRECT_SOURCE_PACKAGES
+        val referrerHost = referrer?.host
+        val fromKnownSource = referrerHost in REDIRECT_SOURCE_PACKAGES
         val controller = MediaProbeListener.instance?.currentController()
         if (fromKnownSource && controller != null) {
             val redirect = packageManager.getLaunchIntentForPackage(controller.packageName)
