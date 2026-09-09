@@ -52,6 +52,12 @@ class MainActivity : Activity() {
             "com.vivo.systemuiplugin", // status bar tap surface
             "com.android.systemui", // lockscreen media widget tap surface
         )
+
+        // The home-screen/AOD OriginPlayer widget launches us with a plain MAIN/LAUNCHER intent
+        // whose referrer is com.bbk.launcher2 — indistinguishable from a direct icon tap by
+        // referrer alone — but tags the intent with this extra (confirmed via logcat on-device).
+        private const val LAUNCH_FROM_EXTRA_KEY = "key_launch_from"
+        private val REDIRECT_LAUNCH_FROM_VALUES = setOf("vivomusicmix")
     }
 
     private lateinit var nowPlayingText: TextView
@@ -104,11 +110,14 @@ class MainActivity : Activity() {
     }
 
     /** Only redirect straight to the real playing app when a known vivo system surface launched
-     *  us (see REDIRECT_SOURCE_PACKAGES). A direct launcher-icon tap (or any other launch) always
+     *  us (see REDIRECT_SOURCE_PACKAGES) or the launch intent carries a known widget marker (see
+     *  LAUNCH_FROM_EXTRA_KEY — needed because the home-screen widget's referrer is indistinguishable
+     *  from a plain launcher-icon tap). A direct launcher-icon tap (or any other launch) always
      *  lands on our own screen instead, with a "now playing" row using the actual controller. */
     private fun handleLaunch() {
         val referrerHost = referrer?.host
-        val fromKnownSource = referrerHost in REDIRECT_SOURCE_PACKAGES
+        val fromKnownSource = referrerHost in REDIRECT_SOURCE_PACKAGES ||
+            intent.getStringExtra(LAUNCH_FROM_EXTRA_KEY) in REDIRECT_LAUNCH_FROM_VALUES
         val controller = MediaProbeListener.instance?.currentController()
         if (fromKnownSource && controller != null) {
             val redirect = packageManager.getLaunchIntentForPackage(controller.packageName)
