@@ -10,6 +10,7 @@ import android.content.IntentFilter
 import android.content.res.Configuration
 import android.media.AudioAttributes
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioTrack
 import android.media.session.MediaController
 import android.media.session.MediaSession
@@ -32,6 +33,10 @@ import androidx.core.app.NotificationCompat
  * putting it into UI_MODE_TYPE_CAR): the real source app's session already reaches the head unit
  * directly, so mirroring it too made Android Auto's media screen show the same "now playing" info
  * twice, as two separate players.
+ *
+ * Also suppressed during an active phone/VoIP call: some dialers expose a MediaSession (for
+ * Bluetooth/Android Auto call-control surfaces) reporting STATE_PLAYING, which this probe would
+ * otherwise mirror as if it were music — see isInCall().
  */
 class MediaProbeListener : NotificationListenerService() {
 
@@ -98,8 +103,15 @@ class MediaProbeListener : NotificationListenerService() {
         (getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager)
             ?.currentModeType == Configuration.UI_MODE_TYPE_CAR
 
+    /** True during an active phone or VoIP call. AudioManager's mode (unlike TelecomManager's
+     *  call state) needs no extra permission and reflects both cellular and VoIP calls alike. */
+    private fun isInCall(): Boolean =
+        (getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.mode.let {
+            it == AudioManager.MODE_IN_CALL || it == AudioManager.MODE_IN_COMMUNICATION
+        }
+
     private fun maybeTrack(controller: MediaController?) {
-        if (isInCarMode()) {
+        if (isInCarMode() || isInCall()) {
             clearSession()
             return
         }
@@ -176,7 +188,7 @@ class MediaProbeListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
-        if (isInCarMode()) return
+        if (isInCarMode() || isInCall()) return
         val token = sbn.notification.extras.getParcelable(
             NotificationCompat.EXTRA_MEDIA_SESSION,
             MediaSession.Token::class.java,
