@@ -83,6 +83,10 @@ it isn't an official build.
 Want to build it yourself, understand the Kugou/Luna package-name spoof, or cut a signed release?
 See [docs/DEV.md](docs/DEV.md).
 
+## Support
+
+If this is useful to you, you can [buy me a coffee](https://buymeacoffee.com/fvhde).
+
 ## License
 
 See [LICENSE](LICENSE) — a **source-available, no-redistribution** license. In short: you can read
