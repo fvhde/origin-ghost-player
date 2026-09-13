@@ -19,6 +19,9 @@ prefer:
 This is a hobby project, not an official vivo/iQOO/OriginOS product, and not affiliated with Kugou
 or Luna.
 
+## Credit
+Credit to https://github.com/theVakhovskeIsTaken and https://github.com/theVakhovskeIsTaken/CunnyPlayground for the documentation
+
 ## What it does
 
 - **Watches for any active media session** system-wide (via notification-listener access) and
