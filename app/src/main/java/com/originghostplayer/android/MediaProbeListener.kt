@@ -36,7 +36,10 @@ import androidx.core.app.NotificationCompat
  *
  * Also suppressed during an active phone/VoIP call: some dialers expose a MediaSession (for
  * Bluetooth/Android Auto call-control surfaces) reporting STATE_PLAYING, which this probe would
- * otherwise mirror as if it were music — see isInCall().
+ * otherwise mirror as if it were music — see isInCall(). Conferencing apps (Teams, Meet, etc.)
+ * expose the same kind of call-control MediaSession but don't consistently flip AudioManager's
+ * mode to MODE_IN_COMMUNICATION, so isInCall() also checks for active voice-communication audio
+ * output directly — see #7.
  */
 class MediaProbeListener : NotificationListenerService() {
 
@@ -104,11 +107,26 @@ class MediaProbeListener : NotificationListenerService() {
             ?.currentModeType == Configuration.UI_MODE_TYPE_CAR
 
     /** True during an active phone or VoIP call. AudioManager's mode (unlike TelecomManager's
-     *  call state) needs no extra permission and reflects both cellular and VoIP calls alike. */
-    private fun isInCall(): Boolean =
-        (getSystemService(Context.AUDIO_SERVICE) as? AudioManager)?.mode.let {
-            it == AudioManager.MODE_IN_CALL || it == AudioManager.MODE_IN_COMMUNICATION
+     *  call state) needs no extra permission and reflects both cellular and VoIP calls alike —
+     *  but dialers are the only apps guaranteed to set it. Conferencing apps (Teams, Meet, Zoom)
+     *  often route call audio without ever touching AudioManager.mode, so also treat any
+     *  currently-active USAGE_VOICE_COMMUNICATION audio output as a call: that reflects what's
+     *  actually being routed regardless of whether the app itself sets the mode, still needs no
+     *  extra permission (unlike the recording-configuration equivalent), and is exactly the kind
+     *  of playback these apps' call-control MediaSession is standing in for. See #7. */
+    private fun isInCall(): Boolean {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
+        if (audioManager.mode == AudioManager.MODE_IN_CALL ||
+            audioManager.mode == AudioManager.MODE_IN_COMMUNICATION
+        ) {
+            return true
         }
+        return runCatching {
+            audioManager.activePlaybackConfigurations.any {
+                it.audioAttributes.usage == AudioAttributes.USAGE_VOICE_COMMUNICATION
+            }
+        }.getOrDefault(false)
+    }
 
     private fun maybeTrack(controller: MediaController?) {
         if (isInCarMode() || isInCall()) {
