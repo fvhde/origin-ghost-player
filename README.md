@@ -1,97 +1,57 @@
 # Origin Ghost Player
+<div align="center">
 
-**Make OriginOS's native OriginPlayer widget show up for any app.**
+[![Release](https://img.shields.io/github/v/release/fvhde/origin-ghost-player)](https://github.com/fvhde/origin-ghost-player/releases)
+[![Downloads](https://img.shields.io/github/downloads/fvhde/origin-ghost-player/total)](https://github.com/fvhde/origin-ghost-player/releases)
 
-OriginOS (vivo/iQOO's Android skin) has a native "OriginPlayer" media widget that only activates for
-a short whitelist of media apps it recognizes. Origin Ghost Player bridges any real app's media
-session — Spotify, a browser tab, whatever's actually playing — onto a whitelisted identity, so
-OriginPlayer renders its native widget for it. The app itself stays invisible: no notification, no
-persistent UI, just a background bridge.
+</div>
 
-Ships as two builds, same code, different spoofed identity — pick whichever native widget you
-prefer:
+<div align="center">
+  
+Shows OriginOS's native **OriginPlayer** widget for *any* media app, not just whitelisted ones.
+Runs invisibly in the background, and widget controls go straight to the real app.
 
-- **Kugou** (`origin-ghost-player-kugou-<version>.apk`) — the original, most-tested identity.
-- **Luna** (`origin-ghost-player-luna-<version>.apk`) — Luna Music's identity gets a noticeably
-  bigger lockscreen widget (more room for album art and text) and karaoke support in OriginPlayer
-  that Kugou's doesn't surface.
+<sub>Hobby project, not affiliated with vivo, iQOO, OriginOS, Kugou or Luna.</sub>
 
-This is a hobby project, not an official vivo/iQOO/OriginOS product, and not affiliated with Kugou
-or Luna.
+**Credits** · OriginIsland doc api by [@theVakhovskeIsTaken](https://github.com/theVakhovskeIsTaken)
 
-## Credit
-Credit to https://github.com/theVakhovskeIsTaken and https://github.com/theVakhovskeIsTaken/CunnyPlayground for the documentation
+**Support** · [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/fvhde)
 
-## What it does
+</div>
 
-- **Watches for any active media session** system-wide (via notification-listener access) and
-  mirrors whichever one is actually playing.
-- **No card of its own, no notification.** Unlike [origin-isle](https://github.com/fvhde/origin-isle)
-  (which posts real notification-based cards), this app publishes nothing visible — OriginOS's own
-  native OriginPlayer chrome is the only thing you see.
-- **Real playback controls.** Tapping OriginPlayer's controls or its widget forwards straight back
-  to the real source app.
-- **Survives being swiped away**, same keep-alive recipe as origin-isle.
+> [!WARNING]
+> **vivo/iQOO + OriginOS only.**
 
-## Before you install
+## Download
 
-- **This only works on vivo/iQOO phones running OriginOS.** Elsewhere it just runs invisibly and does
-  nothing.
-- **It can't be installed alongside the real app whose identity it's using** — the Kugou build
-  conflicts with the real Kugou Music Lite app (酷狗音乐概念版, `com.kugou.android.lite`), the Luna
-  build conflicts with the real Luna Music app (`com.luna.music`) — same applicationId, same as
-  origin-isle's AMap conflict. Uninstall the real one first if you have it. See
-  [docs/DEV.md](docs/DEV.md) for why.
-- **It reads your notifications** (to find media sessions), so ONLY install it from this repo's
-  Releases page.
+| Build | Imitates | Why pick it |
+|-------|----------|-------------|
+| **Kugou** | `com.kugou.android.lite` | Most tested |
+| **Luna** | `com.luna.music` | Bigger lockscreen widget, karaoke |
 
-## Installing
+Get it from **[Releases](https://github.com/fvhde/origin-ghost-player/releases)**, install, open it, and grant:
+- **Notification access** (required)
+- **Unrestricted background** (recommended)
 
-1. Go to this repo's **[Releases](https://github.com/fvhde/origin-ghost-player/releases)** page and
-   download either `origin-ghost-player-kugou-<version>.apk` or `origin-ghost-player-luna-<version>.apk`
-   (see above for the difference) **and** its matching `.sha256` file.
-2. **Check the checksum** (confirms the file wasn't corrupted or swapped for something else):
-   ```
-   shasum -a 256 origin-ghost-player-<variant>-<version>.apk
-   ```
-   Compare the result to the `.sha256` file you downloaded — they should match exactly.
-3. **On your phone**, allow installing apps from this source when prompted, then open the downloaded
-   APK to install it.
-4. **Open Origin Ghost Player.** The first screen explains and links to the two permissions it
-   wants: notification access (required) and unrestricted background running (recommended, so
-   OriginOS doesn't kill the bridge while your screen is off).
-5. Play something in any media app and check your status bar / lock screen / always-on-display for
-   the native OriginPlayer widget.
+<details>
+<summary><b>Verify your download</b></summary>
 
-## Verifying you have a genuine build
-
-This app reads your notifications, so confirm any downloaded APK actually came from the maintainer.
-It's signed with the **same key as origin-isle**:
-
+```sh
+shasum -a 256 origin-ghost-player-<variant>-<version>.apk   # must match the .sha256 file
+apksigner verify --print-certs origin-ghost-player-<variant>-<version>.apk
 ```
-apksigner verify --print-certs origin-ghost-player-<version>.apk
+Expected certificate:
 ```
-
-The output should show this fingerprint:
-
+5D:2D:FA:7E:F6:A9:6B:95:4A:C2:43:61:A3:30:BA:9B:2C:EA:45:18:C5:B8:63:58:C9:F4:FF:B1:1D:79:E6:00
 ```
-SHA-256: 5D:2D:FA:7E:F6:A9:6B:95:4A:C2:43:61:A3:30:BA:9B:2C:EA:45:18:C5:B8:63:58:C9:F4:FF:B1:1D:79:E6:00
-```
+Doesn't match? **Don't install.**
+</details>
 
-If either the checksum or the certificate fingerprint doesn't match, **don't install the file** —
-it isn't an official build.
+<details>
+<summary><b>Developers</b></summary>
 
-## For developers
+Building, the package spoof, and signing: [docs/DEV.md](docs/DEV.md)
+</details>
 
-Want to build it yourself, understand the Kugou/Luna package-name spoof, or cut a signed release?
-See [docs/DEV.md](docs/DEV.md).
-
-## Support
-
-If this is useful to you, you can [buy me a coffee](https://buymeacoffee.com/fvhde).
-
-## License
-
-See [LICENSE](LICENSE) — a **source-available, no-redistribution** license. In short: you can read
-the code and build it for your own devices, but you can't redistribute the source, modified versions,
-or any build of it (signed or not) to anyone else.
+---
+**License** · Source-available, no redistribution. See [LICENSE](LICENSE)
