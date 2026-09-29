@@ -1,4 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#673AB7</color>
+
+    <color name="page_background">#F2F3F5</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="text_primary">#15161A</color>
+    <color name="text_secondary">#62666F</color>
+    <color name="chevron">#9A9DA5</color>
+    <color name="accent">#3159F0</color>
+    <color name="accent_dark">#2344C4</color>
+    <color name="accent_soft">#E3E9FE</color>
+    <color name="search_background">#E4E6EA</color>
+    <color name="switch_track_off">#DADCE1</color>
+    <color name="island_background">#0B0B0D</color>
+    <color name="island_icon_background">#34353B</color>
+    <color name="island_text_secondary">#A3A6AE</color>
+    <color name="island_bars">#5B7CFF</color>
 </resources>

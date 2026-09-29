@@ -3,12 +3,17 @@ package com.originghostplayer.android
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.media.MediaMetadata
+import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
-import android.widget.Button
+import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.ViewCompat
@@ -58,11 +63,29 @@ class MainActivity : Activity() {
         // referrer alone — but tags the intent with this extra (confirmed via logcat on-device).
         private const val LAUNCH_FROM_EXTRA_KEY = "key_launch_from"
         private val REDIRECT_LAUNCH_FROM_VALUES = setOf("vivomusicmix")
+
+        private const val PREVIEW_REFRESH_MS = 1000L
     }
 
-    private lateinit var nowPlayingText: TextView
+    private lateinit var nowPlayingIsland: View
+    private lateinit var nowPlayingArt: ImageView
+    private lateinit var nowPlayingTitle: TextView
+    private lateinit var nowPlayingApp: TextView
+    private lateinit var nowPlayingBars: View
+    private lateinit var nowPlayingHint: TextView
     private lateinit var statusText: TextView
     private lateinit var batteryStatusText: TextView
+    private lateinit var ignoredAppsSummary: TextView
+    private lateinit var ignoredAppsCount: TextView
+
+    /** Keeps the live preview in step with the listener's 1s poll while we're on screen. */
+    private val previewHandler = Handler(Looper.getMainLooper())
+    private val previewRunnable = object : Runnable {
+        override fun run() {
+            refreshNowPlaying()
+            previewHandler.postDelayed(this, PREVIEW_REFRESH_MS)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,14 +98,25 @@ class MainActivity : Activity() {
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
-        nowPlayingText = findViewById(R.id.now_playing_text)
+        nowPlayingIsland = findViewById(R.id.now_playing_island)
+        nowPlayingArt = findViewById(R.id.now_playing_art)
+        nowPlayingArt.clipToOutline = true
+        nowPlayingTitle = findViewById(R.id.now_playing_title)
+        nowPlayingApp = findViewById(R.id.now_playing_app)
+        nowPlayingBars = findViewById(R.id.now_playing_bars)
+        nowPlayingHint = findViewById(R.id.now_playing_hint)
         statusText = findViewById(R.id.status_text)
         batteryStatusText = findViewById(R.id.battery_status_text)
-        findViewById<Button>(R.id.open_settings_button).setOnClickListener {
+        ignoredAppsSummary = findViewById(R.id.ignored_apps_summary)
+        ignoredAppsCount = findViewById(R.id.ignored_apps_count)
+        findViewById<View>(R.id.notification_access_row).setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
-        findViewById<Button>(R.id.allow_background_button).setOnClickListener {
+        findViewById<View>(R.id.background_running_row).setOnClickListener {
             requestIgnoreBattery(this)
+        }
+        findViewById<View>(R.id.ignored_apps_row).setOnClickListener {
+            startActivity(Intent(this, IgnoredAppsActivity::class.java))
         }
         // Grant on every app open too, not just when the listener (re)connects — cheap and
         // matches OrangeBox-src's OriginIsleApp.onCreate() pattern.
@@ -107,6 +141,12 @@ class MainActivity : Activity() {
         super.onResume()
         RebindHelper.forceRebindIfNeeded(applicationContext)
         refreshStatus()
+        previewHandler.postDelayed(previewRunnable, PREVIEW_REFRESH_MS)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        previewHandler.removeCallbacks(previewRunnable)
     }
 
     /** Only redirect straight to the real playing app when a known vivo system surface launched
@@ -131,30 +171,71 @@ class MainActivity : Activity() {
     }
 
     private fun refreshStatus() {
-        statusText.text = if (isListenerEnabled(this)) {
-            getString(R.string.status_granted)
-        } else {
-            getString(R.string.status_not_granted)
-        }
-        batteryStatusText.text = if (isBatteryUnrestricted(this)) {
-            getString(R.string.battery_granted)
-        } else {
-            getString(R.string.battery_not_granted)
-        }
+        statusText.text = getString(
+            if (isListenerEnabled(this)) R.string.state_granted else R.string.state_not_granted,
+        )
+        batteryStatusText.text = getString(
+            if (isBatteryUnrestricted(this)) R.string.state_unrestricted else R.string.state_restricted,
+        )
 
+        val ignored = IgnoredApps.get(this).map { appLabelFor(it).toString() }.sortedBy { it.lowercase() }
+        ignoredAppsSummary.text = if (ignored.isEmpty()) {
+            getString(R.string.ignored_apps_none)
+        } else {
+            ignored.joinToString(", ")
+        }
+        ignoredAppsCount.text = ignored.size.toString()
+        ignoredAppsCount.visibility = if (ignored.isEmpty()) View.GONE else View.VISIBLE
+
+        refreshNowPlaying()
+    }
+
+    /** The live preview: whatever the listener is currently mirroring, tapping through to the
+     *  real source app. Ignored apps never show here — the listener never tracks them. */
+    private fun refreshNowPlaying() {
         val controller = MediaProbeListener.instance?.currentController()
         if (controller == null) {
-            nowPlayingText.text = getString(R.string.now_playing_none)
-            nowPlayingText.setOnClickListener(null)
+            nowPlayingTitle.text = getString(R.string.now_playing_none)
+            nowPlayingApp.visibility = View.GONE
+            nowPlayingBars.visibility = View.GONE
+            nowPlayingHint.visibility = View.GONE
+            showArt(null)
+            nowPlayingIsland.setOnClickListener(null)
+            nowPlayingIsland.isClickable = false
+            nowPlayingIsland.contentDescription = getString(R.string.now_playing_none)
             return
         }
         val md = controller.metadata
         val title = md?.getString(MediaMetadata.METADATA_KEY_TITLE)?.trim().orEmpty().ifBlank { "?" }
         val artist = md?.getString(MediaMetadata.METADATA_KEY_ARTIST)?.trim().orEmpty()
         val appLabel = appLabelFor(controller.packageName)
-        nowPlayingText.text = getString(R.string.now_playing_format, title, artist, appLabel)
-        nowPlayingText.setOnClickListener {
+        // Sources without a PlaybackState (Firefox) are mirrored as playing — match that here.
+        val playing = controller.playbackState?.state.let { it == null || it == PlaybackState.STATE_PLAYING }
+
+        nowPlayingTitle.text = title
+        nowPlayingApp.text = if (artist.isEmpty()) appLabel else "$artist · $appLabel"
+        nowPlayingApp.visibility = View.VISIBLE
+        nowPlayingBars.visibility = if (playing) View.VISIBLE else View.INVISIBLE
+        nowPlayingHint.visibility = View.VISIBLE
+        nowPlayingHint.text = getString(R.string.now_playing_hint)
+        showArt(
+            md?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+                ?: md?.getBitmap(MediaMetadata.METADATA_KEY_ART),
+        )
+        nowPlayingIsland.contentDescription = getString(R.string.now_playing_description, title, appLabel)
+        nowPlayingIsland.setOnClickListener {
             packageManager.getLaunchIntentForPackage(controller.packageName)?.let(::startActivity)
+        }
+    }
+
+    private fun showArt(art: Bitmap?) {
+        if (art != null) {
+            nowPlayingArt.setPadding(0, 0, 0, 0)
+            nowPlayingArt.setImageBitmap(art)
+        } else {
+            val pad = (12 * resources.displayMetrics.density).toInt()
+            nowPlayingArt.setPadding(pad, pad, pad, pad)
+            nowPlayingArt.setImageResource(R.drawable.ic_media_play)
         }
     }
 

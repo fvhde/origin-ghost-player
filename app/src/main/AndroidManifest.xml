@@ -38,6 +38,12 @@
             </intent-filter>
         </activity>
 
+        <!-- The "Ignored apps" filter page, only ever opened from MainActivity. -->
+        <activity
+            android:name=".IgnoredAppsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Listens system-wide for other apps' media sessions and mirrors them onto this app's
              OWN MediaSession under its (spoofed) identity — nothing else, no notification posted. -->
         <service

@@ -26,8 +26,8 @@ android {
         // identities.
         minSdk = 34
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.3.8"
+        versionCode = 14
+        versionName = "1.0.0"
     }
 
     flavorDimensions += "identity"

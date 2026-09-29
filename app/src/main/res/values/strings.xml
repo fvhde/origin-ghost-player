@@ -3,14 +3,34 @@
     <string name="app_name">Origin Ghost Player</string>
     <string name="channel_name">Origin Ghost Player</string>
     <string name="channel_desc">Relays the currently playing external media session</string>
-    <string name="explanation">This app needs notification-listener access to detect which app is currently playing media — that\'s how it finds the active session to mirror. It never reads notification text/content, only media-session info (title, artist, playback state).</string>
-    <string name="status_granted">Notification access: granted ✓</string>
-    <string name="status_not_granted">Notification access: NOT granted</string>
-    <string name="open_settings">Open notification listener settings</string>
-    <string name="battery_explanation">Also allow unrestricted background running, so OriginOS doesn\'t kill the bridge while your screen is off or another app is in the foreground.</string>
-    <string name="battery_granted">Background run: unrestricted ✓</string>
-    <string name="battery_not_granted">Background run: restricted (tap to allow)</string>
-    <string name="allow_background">Allow background run</string>
+    <string name="main_subtitle">Mirrors playing media to OriginPlayer</string>
+
+    <string name="live_preview">Live preview</string>
     <string name="now_playing_none">Nothing playing right now</string>
-    <string name="now_playing_format">▶ %1$s\n%2$s\nvia %3$s — tap to open</string>
+    <string name="now_playing_hint">Tap the preview to open the app</string>
+    <string name="now_playing_description">Now playing: %1$s, via %2$s. Tap to open %2$s.</string>
+
+    <string name="section_setup">Setup</string>
+    <string name="notification_access">Notification access</string>
+    <string name="notification_access_sub">Reads media sessions only</string>
+    <string name="background_running">Background running</string>
+    <string name="background_running_sub">Keeps the bridge alive</string>
+    <string name="state_granted">Granted</string>
+    <string name="state_not_granted">Not granted</string>
+    <string name="state_unrestricted">Unrestricted</string>
+    <string name="state_restricted">Restricted</string>
+
+    <string name="section_filter">Filter</string>
+    <string name="ignored_apps">Ignored apps</string>
+    <string name="ignored_apps_none">None, every app is mirrored</string>
+
+    <string name="back">Back</string>
+    <string name="ignored_apps_explanation">Turned-on apps never reach OriginPlayer.</string>
+    <string name="search_apps">Search apps</string>
+    <string name="section_recent">Played media recently</string>
+    <string name="section_other">Other installed apps</string>
+    <string name="playing_now">Playing now</string>
+    <string name="loading_apps">Loading apps…</string>
+    <string name="no_apps_found">No apps match your search</string>
+    <string name="ignore_app">Ignore %1$s</string>
 </resources>

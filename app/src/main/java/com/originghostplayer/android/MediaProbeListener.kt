@@ -88,6 +88,12 @@ class MediaProbeListener : NotificationListenerService() {
     /** Exposed for [MediaButtonReceiver], which has no other way to reach the tracked controller. */
     fun currentController(): MediaController? = trackedController
 
+    /** Re-evaluate right now — called when the user (un)ignores an app, so the change applies
+     *  immediately instead of on the next poll tick. Safe to call from any thread. */
+    fun retrack() {
+        pollHandler.post { maybeTrack(pickController(activeSessions())) }
+    }
+
     private val pollRunnable = object : Runnable {
         override fun run() {
             maybeTrack(pickController(activeSessions()))
@@ -97,8 +103,22 @@ class MediaProbeListener : NotificationListenerService() {
 
     private val sessionsChangedListener =
         MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-            maybeTrack(pickController(controllers?.filter { it.packageName != packageName }))
+            maybeTrack(pickController(mirrorable(controllers)))
         }
+
+    /** Drops our own session and any app the user chose to ignore (see [IgnoredApps]) — neither
+     *  may ever be tracked. Also notes every playing app for [MediaHistory] on the way, ignored
+     *  ones included. */
+    private fun mirrorable(controllers: List<MediaController>?): List<MediaController>? {
+        val others = controllers?.filter { it.packageName != packageName } ?: return null
+        others.forEach {
+            if (it.playbackState?.state == PlaybackState.STATE_PLAYING) {
+                MediaHistory.notePlaying(this, it.packageName)
+            }
+        }
+        val ignored = IgnoredApps.get(this)
+        return others.filter { it.packageName !in ignored }
+    }
 
     /** True while Android Auto has the phone projected onto a head unit. See the class doc for
      *  why mirroring is suppressed in that state. */
@@ -206,6 +226,7 @@ class MediaProbeListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
+        if (IgnoredApps.isIgnored(this, sbn.packageName)) return
         if (isInCarMode() || isInCall()) return
         val token = sbn.notification.extras.getParcelable(
             NotificationCompat.EXTRA_MEDIA_SESSION,
@@ -228,11 +249,13 @@ class MediaProbeListener : NotificationListenerService() {
     }
 
     /** Never includes our own MediaProbeSession — without this filter the poll/listener locks
-     *  onto our own mirrored session and everything (controls, click target) points at itself. */
+     *  onto our own mirrored session and everything (controls, click target) points at itself.
+     *  Ignored apps are left out too, see [mirrorable]. */
     private fun activeSessions(): List<MediaController>? = runCatching {
-        getSystemService(MediaSessionManager::class.java)
-            ?.getActiveSessions(ComponentName(this, MediaProbeListener::class.java))
-            ?.filter { it.packageName != packageName }
+        mirrorable(
+            getSystemService(MediaSessionManager::class.java)
+                ?.getActiveSessions(ComponentName(this, MediaProbeListener::class.java)),
+        )
     }.getOrNull()
 
     /** Sticky: keep whatever we're already tracking as long as it's still playing, rather than
@@ -380,6 +403,7 @@ class MediaProbeListener : NotificationListenerService() {
         // showing us as selected but not updating until you manually reselected another app and
         // back. Re-announcing on every playing-transition covers both cases uniformly.
         val isPlayingNow = state.state == PlaybackState.STATE_PLAYING
+        if (isPlayingNow) MediaHistory.notePlaying(this, controller.packageName)
         val now = SystemClock.elapsedRealtime()
         if (isPlayingNow && !lastKnownPlaying && now - lastBlipBurstAt >= MIN_BLIP_BURST_INTERVAL_MS) {
             lastBlipBurstAt = now
