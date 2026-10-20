@@ -11,7 +11,7 @@
 Shows OriginOS's native **OriginPlayer** widget for *any* media app, not just whitelisted ones.
 Runs invisibly in the background, and widget controls go straight to the real app.
 
-<sub>Hobby project, not affiliated with vivo, iQOO, OriginOS, Kugou or Luna.</sub>
+<sub>Hobby project, not affiliated with vivo, iQOO, OriginOS, JOOX or Luna.</sub>
 
 **Credits** · OriginIsland doc api by [@theVakhovskeIsTaken](https://github.com/theVakhovskeIsTaken)
 
@@ -26,7 +26,7 @@ Runs invisibly in the background, and widget controls go straight to the real ap
 
 | Build | Imitates | Why pick it |
 |-------|----------|-------------|
-| **Kugou** | `com.kugou.android.lite` | Most tested |
+| **JOOX** | `com.tencent.ibg.joox` | Global ROM |
 | **Luna** | `com.luna.music` | Bigger lockscreen widget, karaoke |
 
 Get it from **[Releases](https://github.com/fvhde/origin-ghost-player/releases)**, install, open it, and grant:

@@ -12,18 +12,19 @@ packages it recognizes as media players, and this app's `applicationId` spoofs a
 app's package id to land on that whitelist. **If you change it to something not on that whitelist,
 OriginPlayer will stop reacting to this app.**
 
-Two identities are confirmed working, built from the exact same code:
+Two identities are built from the exact same code:
 
-- **Kugou Music Lite** (酷狗音乐概念版, `com.kugou.android.lite`) — the one this was first proven on.
-- **Luna Music** (`com.luna.music`) — supports karaoke, which Kugou's identity doesn't get you
+- **JOOX** (`com.tencent.ibg.joox`) — whitelisted on global OriginOS ROMs, which don't recognize
+  Kugou Music Lite (`com.kugou.android.lite`, the identity this was first proven on).
+- **Luna Music** (`com.luna.music`) — supports karaoke, which the JOOX identity doesn't get you
   anything extra for, and its OriginPlayer lockscreen widget renders noticeably bigger album art
-  with more room for text than Kugou's does. Same bridge logic either way; only the identity (and
+  with more room for text. Same bridge logic either way; only the identity (and
   therefore which native widget layout OriginOS picks) differs.
 
 Consequences of spoofing either one:
 
 1. **It cannot be installed alongside the real app whose identity it's using** (same applicationId
-   → package conflict). Uninstall the real Kugou Music Lite or Luna Music app first if you have it.
+   → package conflict). Uninstall the real JOOX or Luna Music app first if you have it.
 2. **This can never ship on the Play Store** or be distributed as if it were that real app. It's a
    personal sideload — install it on your own device, understand what you're installing.
 
@@ -41,7 +42,7 @@ of its own at all. Instead:
    notifications, falling back to `MediaSessionManager.getActiveSessions()` for apps that omit it
    (e.g. Firefox).
 2. It mirrors whatever it finds — metadata, playback state — onto its **own** `MediaSession`,
-   created under the spoofed identity (Kugou or Luna — see above). Real playback control taps are
+   created under the spoofed identity (JOOX or Luna — see above). Real playback control taps are
    forwarded straight back to the real source app's `MediaController.transportControls`.
 3. That's it. No notification, no UI most of the time. OriginOS's OriginPlayer sees a whitelisted
    package with an active, fully-formed media session (real players' sessions all carry a

@@ -27,20 +27,20 @@ android {
         minSdk = 34
         targetSdk = 36
         versionCode = 14
-        versionName = "1.0.0"
+        versionName = "1.0.1"
     }
 
     flavorDimensions += "identity"
     productFlavors {
-        create("kugou") {
+        create("joox") {
             dimension = "identity"
-            // Kugou Music Lite (酷狗音乐概念版) — the identity this was first proven on.
-            applicationId = "com.kugou.android.lite"
+            // JOOX — whitelisted on global OriginOS ROMs, where Kugou Music Lite isn't.
+            applicationId = "com.tencent.ibg.joox"
         }
         create("luna") {
             dimension = "identity"
             // Luna Music — bigger lockscreen widget + karaoke support in OriginPlayer that
-            // Kugou's identity doesn't get you. Same code otherwise.
+            // the other identity doesn't get you. Same code otherwise.
             applicationId = "com.luna.music"
         }
     }

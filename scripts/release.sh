@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build, sign, verify and fingerprint both release APK variants (Kugou + Luna identity), then
+# Build, sign, verify and fingerprint both release APK variants (JOOX + Luna identity), then
 # stage them for a GitHub Release.
 #
 # Run this on the machine that holds your signing key, from the repo root:
@@ -12,7 +12,7 @@
 #   - Android SDK build-tools on PATH (for apksigner), or ANDROID_HOME/ANDROID_SDK_ROOT set
 #
 # Output (in ./dist/), one pair per flavor:
-#   - origin-ghost-player-kugou-<version>.apk / .apk.sha256
+#   - origin-ghost-player-joox-<version>.apk  / .apk.sha256
 #   - origin-ghost-player-luna-<version>.apk  / .apk.sha256
 #   - a printed signing-certificate SHA-256 fingerprint per APK — should match origin-isle's and
 #     each other, since both variants and origin-isle are signed with the same key.
@@ -50,7 +50,7 @@ fi
 
 mkdir -p dist
 
-for FLAVOR in kugou luna; do
+for FLAVOR in joox luna; do
   FLAVOR_CAP="$(tr '[:lower:]' '[:upper:]' <<< "${FLAVOR:0:1}")${FLAVOR:1}"
 
   echo "==> Building signed release: $FLAVOR (versionName=$VERSION) ..."
@@ -85,7 +85,7 @@ for FLAVOR in kugou luna; do
 done
 
 echo "==> Done."
-echo "    dist/origin-ghost-player-kugou-${VERSION}.apk (+ .sha256)"
+echo "    dist/origin-ghost-player-joox-${VERSION}.apk  (+ .sha256)"
 echo "    dist/origin-ghost-player-luna-${VERSION}.apk  (+ .sha256)"
 echo
 echo "    Upload all four files to the same GitHub Release. The certificate fingerprints printed"
